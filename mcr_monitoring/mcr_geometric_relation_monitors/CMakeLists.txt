@@ -10,9 +10,7 @@ find_package(catkin REQUIRED
     mcr_monitoring_msgs
 )
 
-generate_dynamic_reconfigure_options(
-  ros/config/ComponentWisePoseErrorMonitor.cfg
-)
+catkin_python_setup()
 
 catkin_package(
   INCLUDE_DIRS
@@ -27,27 +25,6 @@ catkin_package(
 include_directories(
   ros/include
   ${catkin_INCLUDE_DIRS}
-)
-
-add_executable(component_wise_pose_error_monitor_node
-  ros/src/component_wise_pose_error_monitor_node.cpp
-)
-
-add_dependencies(component_wise_pose_error_monitor_node
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_gencfg
-)
-
-target_link_libraries(component_wise_pose_error_monitor_node
-  ${catkin_LIBRARIES}
-)
-
-install(
-  TARGETS
-    component_wise_pose_error_monitor_node
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 install(
