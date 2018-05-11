@@ -49,6 +49,7 @@ class DirectBaseControllerCoordinator(object):
 
         # node cycle rate (in hz)
         self.loop_rate = rospy.Rate(rospy.get_param('~loop_rate', 100.0))
+        self.idle_loop_rate = rospy.Rate(rospy.get_param('~idle_loop_rate', 1.0))
         self.near_zero = rospy.get_param('~near_zero', 0.001)
 
         self.base_frame = rospy.get_param('~base_frame', 'base_link')
@@ -124,7 +125,10 @@ class DirectBaseControllerCoordinator(object):
                 state = self.running_state()
 
             rospy.logdebug("State: {0}".format(state))
-            self.loop_rate.sleep()
+            if state == 'INIT':
+                self.idle_loop_rate.sleep()
+            elif state == 'RUNNING':
+                self.loop_rate.sleep()
 
     def init_state(self):
         """import group3_direct_base_controller.cfg.TransformToPoseConverterConfig as TransformToPoseConverterConfig
@@ -137,7 +141,16 @@ class DirectBaseControllerCoordinator(object):
         """
         if self.event == 'e_start':
             self.event = None
+            self.collision_filter_feedback = None
             return 'RUNNING'
+        elif self.event == 'e_stop':
+            self.event = None
+            self.pose_monitor_feedback = None
+            self.started_components = False
+            self.collision_filter_feedback = None
+            self.publish_zero_velocities()
+            self.event_out.publish('e_stopped')
+            return 'INIT'
         else:
             return 'INIT'
 
@@ -152,15 +165,14 @@ class DirectBaseControllerCoordinator(object):
         """
 
         if self.event == 'e_stop':
-            self.event_out.publish('e_stopped')
             self.event = None
             self.pose_monitor_feedback = None
             self.started_components = False
-
             self.publish_zero_velocities()
+            self.event_out.publish('e_stopped')
 
             return 'INIT'
-
+        
         # Get converted pose and calculate the pose error and publish
         origin_pose = geometry_msgs.msg.PoseStamped()
         origin_pose.header.frame_id = self.base_frame
@@ -184,11 +196,9 @@ class DirectBaseControllerCoordinator(object):
             return 'INIT'
         else:
             if self.use_collision_avoidance and \
-                        (self.collision_filter_feedback == "e_reduced_velocities_forwarded" or \
-                        self.collision_filter_feedback == "e_zero_velocities_forwarded"):
-                if (pose_error.linear.y > 0.02):
-                    pose_error.linear.x = -0.02
-                self.collision_filter_feedback = None
+                        (self.collision_filter_feedback == "e_zero_velocities_forwarded"):
+                  pose_error.linear.x = -0.02
+                  self.collision_filter_feedback = None
 
             cartesian_velocity = self.twist_controller.get_cartesian_velocity(pose_error)
             if cartesian_velocity:
@@ -235,6 +245,7 @@ class DirectBaseControllerCoordinator(object):
             config.max_velocity_roll,\
             config.max_velocity_pitch\
             )
+        self.loop_rate = rospy.Rate(config.loop_rate)
         return config
 
 def main():
